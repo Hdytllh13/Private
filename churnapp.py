@@ -25,7 +25,18 @@ st.divider()
 # Input user
 user_input = {}
 for f in features:
+    if f == 'marital_status':
+           # Dropdown pilihan status pernikahan
+        user_input[f] = st.selectbox(
+            "Marital Status",
+            options=["Single", "Married", "Divorced"],  # ubah sesuai data asli kamu
+            index=0
+        )
+    else:
     user_input[f] = st.number_input(f"{f.replace('_', ' ').title()}", value=0.0)
+
+marital_map = {"Single": 0, "Married": 1}
+user_input['marital_status'] = marital_map[user_input['marital_status']]
 
 # Convert ke DataFrame
 input_df = pd.DataFrame([user_input])
