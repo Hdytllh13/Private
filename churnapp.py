@@ -29,7 +29,7 @@ for f in features:
            # Dropdown pilihan status pernikahan
         user_input[f] = st.selectbox(
             "Marital Status",
-            options=["Single", "Married", "Divorced"],  # ubah sesuai data asli kamu
+            options=["Single", "Married"],
             index=0
         )
     else:
