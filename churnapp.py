@@ -33,7 +33,7 @@ for f in features:
             index=0
         )
     else:
-    user_input[f] = st.number_input(f"{f.replace('_', ' ').title()}", value=0.0)
+        user_input[f] = st.number_input(f"{f.replace('_', ' ').title()}", value=0.0)
 
 marital_map = {"Single": 0, "Married": 1}
 user_input['marital_status'] = marital_map[user_input['marital_status']]
