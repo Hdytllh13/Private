@@ -78,14 +78,21 @@ tab1, tab2 = st.tabs(["🧍 Prediksi Individu", "📂 Prediksi Batch"])
 with tab1:
     st.subheader("Prediksi Churn untuk 1 Karyawan")
 
-    target_achievement = st.number_input("🎯 Target Achievement (rasio)", 0.0, 2.0, 1.0, 0.01)
-    company_tenure_years = st.number_input("🧭 Lama bekerja (tahun)", 0.0, 40.0, 3.0, 0.1)
-    distance_to_office_km = st.number_input("📍 Jarak ke kantor (km)", 0.0, 60.0, 5.0, 0.1)
+    col1, col2 = st.columns(2)
+
+    with col1:
+        target_achievement = st.number_input("🎯 Target Achievement (rasio)", 0.0, 2.0, 1.0, 0.01)
+        company_tenure_years = st.number_input("🧭 Lama bekerja (tahun)", 0.0, 40.0, 3.0, 0.1)
+
+    with col2:
+        distance_to_office_km = st.number_input("📍 Jarak ke kantor (km)", 0.0, 60.0, 5.0, 0.1)
+        working_hours_per_week = st.number_input("⌚ Jam kerja/minggu", 20, 80, 40)
+
+    marital_status = st.selectbox("💍 Status Pernikahan", ["Married", "Single"])
+
     job_satisfaction = st.slider("😊 Kepuasan kerja (1-5)", 1, 5, 3)
     manager_support_score = st.slider("🤝 Dukungan manajer (1-5)", 1, 5, 3)
-    marital_status = st.selectbox("💍 Status Pernikahan", ["Married", "Single"])
-    working_hours_per_week = st.number_input("⌚ Jam kerja/minggu", 20, 80, 40)
-
+    
     input_df = pd.DataFrame([{
         "target_achievement": target_achievement,
         "company_tenure_years": company_tenure_years,
