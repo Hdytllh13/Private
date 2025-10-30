@@ -148,7 +148,19 @@ with tab2:
                 axes[1].set_xticklabels(period_counts.index, rotation=15)
                 st.pyplot(fig)
 
-                st.dataframe(df_result.head(10))
+                # Pilihan cara menampilkan sampel
+                view_option = st.selectbox(
+                    "👁️ Lihat hasil prediksi:",
+                    ["10 Baris Pertama", "10 Baris Terakhir", "10 Baris Acak"]
+                    )
+                
+                if view_option == "10 Baris Pertama":
+                    st.dataframe(df_result.head(10))
+                elif view_option == "10 Baris Terakhir":
+                    st.dataframe(df_result.tail(10))
+                else : 
+                    "10 Baris Acak"
+                    st.dataframe(df_result.sample(10))
 
         except Exception as e:
             st.error(f"🚨 Terjadi kesalahan saat membaca atau memproses file: {e}")
