@@ -6,7 +6,7 @@ import streamlit as st
 # Load model
 churn_model = joblib.load("churn_model.pkl")
 churn_period_model = joblib.load("churn_period_model.pkl")
-scaler = joblib.load("scaler2.pkl")
+scaler = joblib.load("scaler.pkl")
 
 st.title("💼 Employee Churn & Period Prediction")
 
