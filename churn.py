@@ -45,6 +45,11 @@ selected_features = [
 
 X_input = input_df[selected_features].copy()
 
+# Pastikan urutan dan nama kolom sesuai dengan scaler yang digunakan saat training
+if hasattr(scaler, "feature_names_in_"):
+    trained_features = list(scaler.feature_names_in_)
+    X_input = X_input.reindex(columns=trained_features, fill_value=0)
+
 # Scaling
 X_scaled = scaler.transform(X_input)
 
