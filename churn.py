@@ -47,10 +47,11 @@ class StrongHybridSampler:
 def load_models():
     churn_model = joblib.load("churn_model.pkl")
     churn_period_model = joblib.load("churn_period_model.pkl")
+    churn_period_features = joblib.load("churn_period_features.pkl")
     scaler = joblib.load("scaler.pkl")
-    return churn_model, churn_period_model, scaler
+    return churn_model, churn_period_model, churn_period_features, scaler
 
-churn_model, churn_period_model, scaler = load_models()
+churn_model, churn_period_model, churn_period_features, scaler = load_models()
 
 # =====================================
 # 🧩 FUNGSI PREPROCESS DATA
@@ -100,25 +101,6 @@ persona_mapping = {
         "recommendation": "Lakukan 1-on-1 untuk memahami motivasi; tawarkan rotasi peran atau tantangan baru."
     }
 }
-
-# =====================================
-# ⚙️ FUNGSI PREDIKSI BATCH
-# =====================================
-def predict_churn_batch(df_raw):
-    X_scaled = preprocess_employee_data(df_raw)
-    churn_pred = churn_model.predict(X_scaled)
-    churn_period_pred = [
-        churn_period_model.predict(X_scaled.iloc[[i]])[0] if c == 1 else 0
-        for i, c in enumerate(churn_pred)
-    ]
-
-    df_result = df_raw.copy()
-    df_result["churn_pred"] = churn_pred
-    df_result["churn_period_pred"] = churn_period_pred
-
-    mapping = {0: "No Churn", 1: "Onboarding", 2: "1 Month", 3: "3 Months"}
-    df_result["churn_period_label"] = df_result["churn_period_pred"].map(mapping)
-    return df_result
 
 # =====================================
 # 🎨 STREAMLIT UI
@@ -192,7 +174,6 @@ with tab1:
                       "Value": X_scaled.iloc[0].values
                       }).sort_values("SHAP Value", key=abs, ascending=False)
                  top_risk_factor = shap_df.iloc[0]["Feature"]
-                 st.warning(f"⚠️ Top Risk Factor karyawan berisiko resign: **{top_risk_factor}**")
             except Exception as e:
                  top_risk_factor = X_scaled.columns[np.argmax(np.abs(X_scaled.iloc[0].values))]
 
@@ -206,6 +187,124 @@ with tab1:
 # =====================================
 # 📂 TAB 2: Prediksi Batch
 # =====================================
+
+# =====================================================
+# 🔧 HELPER FUNCTIONS
+# =====================================================
+def _ensure_numeric_df(df):
+    for c in df.columns:
+        df[c] = pd.to_numeric(df[c], errors='coerce')
+    return df
+
+def align_for_model(X, model):
+    if not hasattr(model, "feature_names_in_"):
+        return X
+    trained_feats = list(model.feature_names_in_)
+    X_aligned = pd.DataFrame(0.0, index=X.index, columns=trained_feats)
+    for col in trained_feats:
+        if col in X.columns:
+            X_aligned[col] = X[col].astype(float)
+    return X_aligned
+
+# =====================================================
+# 🧩 PREPROCESSING
+# =====================================================
+def preprocess_batch_robust(df):
+    df = df.copy()
+    required_cols = [
+        'target_achievement', 'company_tenure_years', 'distance_to_office_km',
+        'job_satisfaction', 'manager_support_score', 'marital_status', 'working_hours_per_week'
+    ]
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"⚠️ Kolom hilang dalam file input: {missing}")
+
+    # Feature engineering
+    df['achieve_status'] = df['target_achievement']
+    df['promotion_potential'] = (
+        (df['job_satisfaction'] + 2 * df['target_achievement']) * np.log(df['company_tenure_years'] + 1)
+    )
+
+    def map_marital(x):
+        if pd.isna(x):
+            return 0
+        s = str(x).strip().lower()
+        return 0 if s in ('married', 'm') else 1
+    df['marital_status'] = df['marital_status'].apply(map_marital)
+
+    selected_features = [
+        'achieve_status', 'company_tenure_years', 'distance_to_office_km',
+        'working_hours_per_week', 'manager_support_score', 'marital_status',
+        'target_achievement', 'promotion_potential'
+    ]
+
+    X = _ensure_numeric_df(df[selected_features])
+
+    # Align to scaler
+    if hasattr(scaler, 'feature_names_in_'):
+        trained_feats = list(scaler.feature_names_in_)
+        X_aligned = pd.DataFrame(0.0, index=X.index, columns=trained_feats)
+        for col in trained_feats:
+            if col in X.columns:
+                X_aligned[col] = X[col].astype(float)
+        X = X_aligned
+
+    X_scaled = scaler.transform(X)
+    return pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
+
+# =====================================================
+# 🧩 PREPROCESS FOR churn_period_model
+# =====================================================
+def preprocess_for_churn_period(df_scaled):
+    df_cp = df_scaled.copy()
+    cp_feats = list(churn_period_features)
+    for col in cp_feats:
+        if col not in df_cp.columns:
+            df_cp[col] = 0.0
+    return df_cp.reindex(columns=cp_feats, fill_value=0.0).astype('float64')
+
+# =====================================================
+# ⚙️ PREDIKSI BERTINGKAT (SINKRON)
+# =====================================================
+def predict_batch_safe(df_raw):
+    X_scaled = preprocess_batch_robust(df_raw)
+    X_for_churn = align_for_model(X_scaled, churn_model)
+
+    churn_pred = churn_model.predict(X_for_churn).astype(int)
+    churn_period_pred = []
+
+    for i, c in enumerate(churn_pred):
+        if int(c) == 0:
+            churn_period_pred.append(0)  # Stayed
+            continue
+
+        Xi_cp = preprocess_for_churn_period(X_scaled.iloc[[i]].copy())
+        Xi_cp = align_for_model(Xi_cp, churn_period_model)
+
+        try:
+            p = int(churn_period_model.predict(Xi_cp)[0]) + 1  # shift 0→1, 1→2, 2→3
+        except Exception:
+            p = 1
+        churn_period_pred.append(p)
+
+    df_result = df_raw.copy().reset_index(drop=True)
+    df_result['churn_pred'] = churn_pred
+    df_result['churn_period_pred'] = churn_period_pred
+
+    # Map period (0 = Stayed, 1=Onboarding, 2=1Month, 3=3Months)
+    mapping = {0: "Stayed", 1: "Onboarding", 2: "1 Month", 3: "3 Months"}
+    df_result['churn_period_label'] = df_result['churn_period_pred'].map(mapping)
+
+    # Pastikan label konsisten
+    df_result.loc[df_result['churn_pred'] == 0, 'churn_period_pred'] = 0
+    df_result.loc[df_result['churn_pred'] == 0, 'churn_period_label'] = "Stayed"
+    df_result.loc[(df_result['churn_pred'] == 1) & (df_result['churn_period_pred'] == 0), 'churn_period_pred'] = 1
+    df_result.loc[(df_result['churn_pred'] == 1) & (df_result['churn_period_label'] == "Stayed"), 'churn_period_label'] = "Onboarding"
+
+    df_result['churn_label_final'] = df_result['churn_pred'].map({0: "No Churn", 1: "Churn"})
+    return df_result
+# =====================================
+
 with tab2:
     st.subheader("📂 Prediksi Banyak Karyawan (Batch Upload)")
 
@@ -253,6 +352,7 @@ with tab2:
                 ax2.bar(period_counts.index, period_counts.values, color=colors)
                 ax2.set_title("Distribusi Periode Churn")
                 ax2.set_ylabel("Jumlah Karyawan")
+                fig2.tight_layout()
                 st.pyplot(fig2)
 
             # ================================
