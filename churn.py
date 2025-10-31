@@ -3,10 +3,45 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
+from collections import Counter
+from imblearn.combine import SMOTEENN
+from imblearn.over_sampling import BorderlineSMOTE
 
 # =====================================
 # 💾 MUAT MODEL DAN SCALER
 # =====================================
+class StrongHybridSampler:
+        def __init__(self, random_state=42, target_factor=1.0, max_samples_per_class=None):
+            self.random_state = random_state
+            self.target_factor = target_factor
+            self.max_samples_per_class = max_samples_per_class
+        
+        def _make_sampling_strategy(self, y):
+            ctr = Counter(y)
+            max_count = max(ctr.values())
+            target = {}
+            for cls, c in ctr.items():
+                desired = int(max_count * self.target_factor)
+                if desired <= c:
+                    continue
+                if self.max_samples_per_class:
+                    desired = min(desired, self.max_samples_per_class)
+                target[cls] = desired
+            return target
+        
+        def fit_resample(self, X, y):
+            sampling_strategy = self._make_sampling_strategy(y)
+            if not sampling_strategy:
+                return X, y
+            try:
+                sampler = BorderlineSMOTE(random_state=self.random_state, sampling_strategy=sampling_strategy)
+                X_res, y_res = sampler.fit_resample(X, y)
+            except Exception:
+                sampler = SMOTEENN(random_state=self.random_state, sampling_strategy=sampling_strategy)
+                X_res, y_res = sampler.fit_resample(X, y)
+            return X_res, y_res
+
+
 @st.cache_resource
 def load_models():
     churn_model = joblib.load("churn_model.pkl")
@@ -42,6 +77,28 @@ def preprocess_employee_data(df):
 
     X_scaled = scaler.transform(X)
     return pd.DataFrame(X_scaled, columns=X.columns)
+
+# =====================================
+# 🔍 HR PERSONA & RECOMMENDATION MAPPING
+# =====================================
+persona_mapping = {
+    "Stayed": {
+        "persona": "Committed Performer",
+        "recommendation": "Berikan peluang pengembangan karier agar tetap engaged dan loyal."
+    },
+    "Onboarding": {
+        "persona": "Balanced Contributor",
+        "recommendation": "Fokus pada onboarding dan mentoring selama 1–2 bulan pertama untuk memperkuat ikatan."
+    },
+    "1 Month": {
+        "persona": "Cautious Explorer",
+        "recommendation": "Perkuat komunikasi dan dukungan manajerial; pastikan workload dan ekspektasi realistis."
+    },
+    "3 Months": {
+        "persona": "Disengaged Achiever",
+        "recommendation": "Lakukan 1-on-1 untuk memahami motivasi; tawarkan rotasi peran atau tantangan baru."
+    }
+}
 
 # =====================================
 # ⚙️ FUNGSI PREDIKSI BATCH
@@ -106,61 +163,44 @@ with tab1:
     if st.button("🔮 Jalankan Prediksi Individu"):
         X_scaled = preprocess_employee_data(input_df)
         churn_pred = churn_model.predict(X_scaled)[0]
+        churn_prob = churn_model.predict_proba(X_scaled)[0][1]
 
         if churn_pred == 0:
+            churn_status = "Stayed"
             st.success("📊 Prediksi: Karyawan **TIDAK AKAN CHURN**")
+            top_risk_factor = None
+
         else:
+            try:
+                period_pred = int(churn_model.predict(X_scaled)[0])
+                period_labels = {0: "Onboarding", 1: "1 Month", 2: "3 Months"}
+                churn_status = period_labels.get(period_pred, "Churn")
+            except Exception:
+                churn_status = "Churn"
+            st.error(f"📊 Prediksi: Karyawan **AKAN CHURN** ({churn_status})")
+            st.write(f"📈 Probabilitas churn: **{churn_prob*100:.1f}%**")
+
+
+
             st.warning("📊 Prediksi: Karyawan **AKAN CHURN**")
             churn_period_pred = churn_period_model.predict(X_scaled)[0]
             churn_label = {1: "Onboarding", 2: "1 Month", 3: "3 Months"}.get(churn_period_pred, "Unknown")
             st.write(f"⏳ Periode Churn yang Diprediksi: **{churn_label}**")
+        
+        # =====================================
+        # 👤 PERSONA & HR RECOMMENDATION
+        # =====================================
+        persona = persona_mapping.get(churn_status, {}).get("persona", "Unknown")
+        recommendation = persona_mapping.get(churn_status, {}).get("recommendation", "Tidak ada rekomendasi.")
+
+        print(f"👤 Persona: {persona}")
+        print(f"💡 Rekomendasi HR: {recommendation}")
+
+
 
 # =====================================
 # 📂 TAB 2: Prediksi Batch
 # =====================================
 with tab2:
     st.subheader("Prediksi Banyak Karyawan (Batch Upload)")
-    uploaded_file = st.file_uploader("📁 Upload file CSV / Excel", type=["csv", "xlsx"])
-
-    if uploaded_file:
-        try:
-            if uploaded_file.name.endswith(".csv"):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
-
-            st.success(f"✅ File '{uploaded_file.name}' berhasil dimuat! Jumlah baris: {len(df)}")
-
-            if st.button("🚀 Jalankan Prediksi Batch"):
-                df_result = predict_churn_batch(df)
-                st.success("✅ Prediksi batch berhasil dijalankan!")
-
-                # 📊 Grafik
-                fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-                churn_counts = df_result['churn_pred'].value_counts().rename({0: 'No Churn', 1: 'Churn'})
-                axes[0].pie(churn_counts, labels=churn_counts.index, autopct='%1.1f%%', startangle=90)
-                axes[0].set_title("Distribusi Prediksi Churn")
-
-                period_counts = df_result['churn_period_label'].value_counts()
-                axes[1].bar(period_counts.index, period_counts.values)
-                axes[1].set_title("Distribusi Periode Churn")
-                axes[1].set_ylabel("Jumlah Karyawan")
-                axes[1].set_xticklabels(period_counts.index, rotation=15)
-                st.pyplot(fig)
-
-                # Pilihan cara menampilkan sampel
-                view_option = st.selectbox(
-                    "👁️ Lihat hasil prediksi:",
-                    ["10 Baris Pertama", "10 Baris Terakhir", "10 Baris Acak"]
-                    )
-                
-                if view_option == "10 Baris Pertama":
-                    st.dataframe(df_result.head(10))
-                elif view_option == "10 Baris Terakhir":
-                    st.dataframe(df_result.tail(10))
-                else : 
-                    "10 Baris Acak"
-                    st.dataframe(df_result.sample(10))
-
-        except Exception as e:
-            st.error(f"🚨 Terjadi kesalahan saat membaca atau memproses file: {e}")
+    
