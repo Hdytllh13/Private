@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import BorderlineSMOTE
+import shap
 
 # =====================================
 # 💾 MUAT MODEL DAN SCALER
@@ -178,10 +179,27 @@ with tab1:
                 recommendation = persona_mapping.get(churn_status, {}).get("recommendation", "Tidak ada rekomendasi.")
             except Exception:
                 churn_status = "Churn"
+            
+            # =====================================
+            # 🔍 TOP RISK FACTOR MENGGUNAKAN SHAP
+            # =====================================
+            try:
+                 explainer = shap.Explainer(churn_model, feature_names=X_scaled.columns)
+                 shap_values = explainer(X_scaled)
+                 shap_df = pd.DataFrame({
+                      "Feature": X_scaled.columns,
+                      "SHAP Value": shap_values.values[0],
+                      "Value": X_scaled.iloc[0].values
+                      }).sort_values("SHAP Value", key=abs, ascending=False)
+                 top_risk_factor = shap_df.iloc[0]["Feature"]
+                 st.warning(f"⚠️ Top Risk Factor karyawan berisiko resign: **{top_risk_factor}**")
+            except Exception as e:
+                 top_risk_factor = X_scaled.columns[np.argmax(np.abs(X_scaled.iloc[0].values))]
 
             st.error(f"📊 Prediksi: Karyawan **AKAN CHURN** ({churn_status})")
         
         st.write(f"📈 Probabilitas churn: **{churn_prob*100:.1f}%**")
+        st.info(f"⚠️ Top Risk Factor karyawan resign: **{top_risk_factor}**")
         st.write(f"👤 Persona: {persona}")
         st.write(f"💡 Rekomendasi HR: {recommendation}")
 
