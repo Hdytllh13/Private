@@ -151,6 +151,8 @@ with tab1:
         if churn_pred == 0:
             churn_status = "Stayed"
             st.success("📊 Prediksi: Karyawan **TIDAK AKAN CHURN**")
+            persona = "Committed Performer"
+            recommendation = "Berikan peluang pengembangan karier agar tetap engaged dan loyal."
             top_risk_factor = None
         else:
             try:
