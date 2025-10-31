@@ -203,10 +203,101 @@ with tab1:
         st.write(f"👤 Persona: {persona}")
         st.write(f"💡 Rekomendasi HR: {recommendation}")
 
-
 # =====================================
 # 📂 TAB 2: Prediksi Batch
 # =====================================
 with tab2:
-    st.subheader("Prediksi Banyak Karyawan (Batch Upload)")
-    
+    st.subheader("📂 Prediksi Banyak Karyawan (Batch Upload)")
+
+    uploaded_file = st.file_uploader("📁 Upload file CSV / Excel", type=["csv", "xlsx"])
+
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith(".csv"):
+                df_raw = pd.read_csv(uploaded_file)
+            else:
+                df_raw = pd.read_excel(uploaded_file)
+            
+            st.success(f"✅ File berhasil dimuat! Jumlah data: {len(df_raw)} baris")
+
+            # ================================
+            # 🔍 PREDIKSI BATCH
+            # ================================
+            with st.spinner("⏳ Sedang memproses prediksi batch..."):
+                df_result = predict_batch_safe(df_raw)
+
+            st.success("✅ Prediksi batch selesai dan sinkron!")
+
+            # ================================
+            # 📊 VISUALISASI DISTRIBUSI
+            # ================================
+            churn_counts = df_result["churn_label_final"].value_counts().reindex(["Churn", "No Churn"]).fillna(0)
+            period_counts = df_result["churn_period_label"].value_counts().reindex(["Onboarding", "1 Month", "3 Months", "Stayed"]).fillna(0)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                fig1, ax1 = plt.subplots()
+                ax1.pie(
+                    churn_counts.values,
+                    labels=churn_counts.index,
+                    autopct="%1.1f%%",
+                    colors=["#EF5350", "#66BB6A"],
+                    startangle=90
+                )
+                ax1.set_title("Distribusi Churn")
+                st.pyplot(fig1)
+
+            with col2:
+                fig2, ax2 = plt.subplots()
+                colors = ["#FFA726", "#FB8C00", "#F57C00", "#42A5F5"]
+                ax2.bar(period_counts.index, period_counts.values, color=colors)
+                ax2.set_title("Distribusi Periode Churn")
+                ax2.set_ylabel("Jumlah Karyawan")
+                st.pyplot(fig2)
+
+            # ================================
+            # 📈 SAMPLE PREVIEW
+            # ================================
+            st.subheader("📋 Contoh Data Hasil Prediksi")
+            sample_option = st.selectbox("Tampilkan data:", ["Baris awal", "Baris akhir", "Acak"], index=0)
+
+            if sample_option == "Baris awal":
+                st.dataframe(df_result.head(10))
+            elif sample_option == "Baris akhir":
+                st.dataframe(df_result.tail(10))
+            else:
+                st.dataframe(df_result.sample(min(10, len(df_result))))
+
+            # ================================
+            # 🔍 SHAP – ANALISIS FAKTOR RISIKO
+            # ================================
+            st.subheader("🔍 Analisis Faktor Risiko (SHAP)")
+
+            try:
+                # Gunakan data scaled untuk SHAP
+                X_scaled = preprocess_batch_robust(df_raw)
+                X_for_churn = align_for_model(X_scaled, churn_model)
+
+                explainer = shap.Explainer(churn_model, feature_names=X_for_churn.columns)
+                shap_values = explainer(X_for_churn)
+
+                mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
+                shap_importance = pd.DataFrame({
+                    "Feature": X_for_churn.columns,
+                    "Mean |SHAP Value|": mean_abs_shap
+                }).sort_values("Mean |SHAP Value|", ascending=False)
+
+                top5 = shap_importance.head(5)
+                st.write("Top 5 faktor risiko utama yang berkontribusi terhadap churn:")
+                st.dataframe(top5)
+
+                fig3, ax3 = plt.subplots()
+                shap.plots.bar(shap_values, show=False)
+                st.pyplot(fig3)
+
+            except Exception as e:
+                st.warning(f"⚠️ Analisis SHAP tidak dapat dijalankan: {e}")
+
+        except Exception as e:
+            st.error(f"🚨 Gagal memproses file: {e}")
+
