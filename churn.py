@@ -169,33 +169,21 @@ with tab1:
             churn_status = "Stayed"
             st.success("📊 Prediksi: Karyawan **TIDAK AKAN CHURN**")
             top_risk_factor = None
-
         else:
             try:
-                period_pred = int(churn_model.predict(X_scaled)[0])
+                period_pred = int(churn_period_model.predict(X_scaled)[0])
                 period_labels = {0: "Onboarding", 1: "1 Month", 2: "3 Months"}
                 churn_status = period_labels.get(period_pred, "Churn")
+                persona = persona_mapping.get(churn_status, {}).get("persona", "Unknown")
+                recommendation = persona_mapping.get(churn_status, {}).get("recommendation", "Tidak ada rekomendasi.")
             except Exception:
                 churn_status = "Churn"
+
             st.error(f"📊 Prediksi: Karyawan **AKAN CHURN** ({churn_status})")
-            st.write(f"📈 Probabilitas churn: **{churn_prob*100:.1f}%**")
-
-
-
-            st.warning("📊 Prediksi: Karyawan **AKAN CHURN**")
-            churn_period_pred = churn_period_model.predict(X_scaled)[0]
-            churn_label = {1: "Onboarding", 2: "1 Month", 3: "3 Months"}.get(churn_period_pred, "Unknown")
-            st.write(f"⏳ Periode Churn yang Diprediksi: **{churn_label}**")
         
-        # =====================================
-        # 👤 PERSONA & HR RECOMMENDATION
-        # =====================================
-        persona = persona_mapping.get(churn_status, {}).get("persona", "Unknown")
-        recommendation = persona_mapping.get(churn_status, {}).get("recommendation", "Tidak ada rekomendasi.")
-
-        print(f"👤 Persona: {persona}")
-        print(f"💡 Rekomendasi HR: {recommendation}")
-
+        st.write(f"📈 Probabilitas churn: **{churn_prob*100:.1f}%**")
+        st.write(f"👤 Persona: {persona}")
+        st.write(f"💡 Rekomendasi HR: {recommendation}")
 
 
 # =====================================
