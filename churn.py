@@ -380,7 +380,18 @@ with tab2:
                 X_scaled = preprocess_batch_robust(df_raw)
                 X_for_churn = align_for_model(X_scaled, churn_model)
 
-                explainer = shap.Explainer(churn_model, feature_names=X_for_churn.columns)
+                try:
+                    final_model = churn_model.named_steps['model']
+                except Exception:
+                    final_model = churn_model[-1] if hasattr(churn_model, '__getitem__') else churn_model
+                    
+                # Pilih explainer sesuai tipe model
+                model_type = type(final_model).__name__.lower()
+                if "tree" in model_type or "forest" in model_type or "boost" in model_type:
+                    explainer = shap.TreeExplainer(final_model)
+                else:
+                    explainer = shap.LinearExplainer(final_model, X_for_churn)
+
                 shap_values = explainer(X_for_churn)
 
                 mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
