@@ -348,17 +348,21 @@ with tab2:
                     startangle=90,
                     textprops={'fontsize': 10}
                 )
-                ax1.set_title("Distribusi Churn", fontsize=12)
+                ax1.set_title("Distribusi Churn", fontsize=12, pad=10)
+                ax1.axis('equal')
+                plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
                 st.pyplot(fig1, use_container_width=True)
 
             with col2:
                 fig2, ax2 = plt.subplots(figsize=FIGSIZE)
                 colors = ["#FFA726", "#FB8C00", "#F57C00", "#42A5F5"]
-                ax2.bar(period_counts.index, period_counts.values, color=colors)
-                ax2.set_title("Distribusi Periode Churn", fontsize=12)
+                ax2.bar(period_counts.index, period_counts.values, color=colors, width=0.6)
+                ax2.set_title("Distribusi Periode Churn", fontsize=12, pad=10)
                 ax2.set_ylabel("Jumlah Karyawan", fontsize=10)
                 ax2.tick_params(axis='x', rotation=20)
-                fig2.tight_layout()
+                ax2.set_ylim(0, max(period_counts.values)*1.2)
+                ax2.set_aspect('auto')
+                plt.subplots_adjust(left=0.15, right=0.95, top=0.9, bottom=0.15)
                 st.pyplot(fig2, use_container_width=True)
 
             # ================================
@@ -408,9 +412,15 @@ with tab2:
                 st.write("Top 5 faktor risiko utama yang berkontribusi terhadap churn:")
                 st.dataframe(top5)
 
-                fig3, ax3 = plt.subplots(figsize=FIGSIZE)
+                fig3, ax3 = plt.subplots(figsize=(6, 4))   
                 shap.plots.bar(shap_values, show=False)
-                st.pyplot(fig3)
+                plt.title("Fitur Paling Berpengaruh Terhadap Churn", fontsize=12, pad= 10)
+                plt.tight_layout()
+
+                st.markdown("<h5 style='text-align: center;'>Analisis SHAP</h5>", unsafe_allow_html=True)
+                st.markdown("<div style='display: flex; justify-content: center;'>", unsafe_allow_html=True)
+                st.pyplot(fig3, use_container_width=False)
+                st.markdown("</div>", unsafe_allow_html=True)
 
             except Exception as e:
                 st.warning(f"⚠️ Analisis SHAP tidak dapat dijalankan: {e}")
