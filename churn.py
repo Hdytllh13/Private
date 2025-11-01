@@ -175,14 +175,17 @@ with tab1:
                       "SHAP Value": shap_values.values[0],
                       "Value": X_scaled.iloc[0].values
                       }).sort_values("SHAP Value", key=abs, ascending=False)
-                 top_risk_factor = shap_df.iloc[0]["Feature"]
+                 top_factors = shap_df.head(3)
+                 top_risk_factor = ", ".join(top_factors["Feature"].tolist())
             except Exception as e:
-                 top_risk_factor = X_scaled.columns[np.argmax(np.abs(X_scaled.iloc[0].values))]
+                 abs_vals = np.abs(X_scaled.iloc[0].values)
+                 top_idx = np.argsort(abs_vals)[-3:][::-1]
+                 top_risk_factor = ", ".join(X_scaled.columns[top_idx])
 
             st.error(f"📊 Prediksi: Karyawan **AKAN CHURN** ({churn_status})")
         
         st.write(f"📈 Probabilitas churn: **{churn_prob*100:.1f}%**")
-        st.info(f"⚠️ Top Risk Factor karyawan resign: **{top_risk_factor}**")
+        st.info(f"⚠️ Tiga Faktor Utama karyawan resign: **{top_risk_factor}**")
         st.write(f"👤 Persona: {persona}")
         st.write(f"💡 Rekomendasi HR: {recommendation}")
 
