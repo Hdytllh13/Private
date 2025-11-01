@@ -336,26 +336,30 @@ with tab2:
             period_counts = df_result["churn_period_label"].value_counts().reindex(["Onboarding", "1 Month", "3 Months", "Stayed"]).fillna(0)
 
             col1, col2 = st.columns(2)
+            FIGSIZE = (5, 4)
+
             with col1:
-                fig1, ax1 = plt.subplots()
+                fig1, ax1 = plt.subplots(figsize=FIGSIZE)
                 ax1.pie(
                     churn_counts.values,
                     labels=churn_counts.index,
                     autopct="%1.1f%%",
                     colors=["#EF5350", "#66BB6A"],
-                    startangle=90
+                    startangle=90,
+                    textprops={'fontsize': 10}
                 )
-                ax1.set_title("Distribusi Churn")
-                st.pyplot(fig1)
+                ax1.set_title("Distribusi Churn", fontsize=12)
+                st.pyplot(fig1, use_container_width=True)
 
             with col2:
-                fig2, ax2 = plt.subplots()
+                fig2, ax2 = plt.subplots(figsize=FIGSIZE)
                 colors = ["#FFA726", "#FB8C00", "#F57C00", "#42A5F5"]
                 ax2.bar(period_counts.index, period_counts.values, color=colors)
-                ax2.set_title("Distribusi Periode Churn")
-                ax2.set_ylabel("Jumlah Karyawan")
+                ax2.set_title("Distribusi Periode Churn", fontsize=12)
+                ax2.set_ylabel("Jumlah Karyawan", fontsize=10)
+                ax2.tick_params(axis='x', rotation=20)
                 fig2.tight_layout()
-                st.pyplot(fig2)
+                st.pyplot(fig2, use_container_width=True)
 
             # ================================
             # 📈 SAMPLE PREVIEW
@@ -404,7 +408,7 @@ with tab2:
                 st.write("Top 5 faktor risiko utama yang berkontribusi terhadap churn:")
                 st.dataframe(top5)
 
-                fig3, ax3 = plt.subplots()
+                fig3, ax3 = plt.subplots(figsize=FIGSIZE)
                 shap.plots.bar(shap_values, show=False)
                 st.pyplot(fig3)
 
