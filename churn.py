@@ -10,13 +10,36 @@ import shap
 
 st.markdown("""
 <style>
+h2, h3, h4 {
+    color: #2C3E50;
+}
 [data-testid="stMetricValue"] {
     color: #1E8449;
-    font-weight: 600;
+    font-weight: bold;
 }
-h3, h4, h5 { color: #2E4053; }
 </style>
 """, unsafe_allow_html=True)
+
+# =====================================================
+# 🎨 GLOBAL STYLE UNTUK SEMUA GRAFIK
+# =====================================================
+import matplotlib.pyplot as plt
+
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor": "white",
+    "axes.edgecolor": "#E5E8E8",
+    "axes.grid": True,
+    "grid.alpha": 0.4,
+    "grid.linestyle": "--",
+    "axes.titlesize": 11,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans", "Arial"],
+    "legend.fontsize": 8
+})
 
 # =====================================
 # 💾 MUAT MODEL DAN SCALER
@@ -373,27 +396,32 @@ with tab2:
 
             with col1:
                 fig1, ax1 = plt.subplots(figsize=FIGSIZE)
-                ax1.pie(
+                wedges, texts, autotexts = ax1.pie(
                     churn_counts.values,
                     labels=churn_counts.index,
                     autopct="%1.1f%%",
-                    colors=["#EF5350", "#66BB6A"],
+                    colors=["#E74C3C", "#2ECC71"],
                     startangle=90,
-                    textprops={'fontsize': 10}
+                    textprops={'fontsize': 10, 'color': "black"}
                 )
-                ax1.set_title("Distribusi Churn", fontsize=12, pad=10)
+                for t in texts:
+                    t.set_fontsize(9)
+                for at in autotexts:
+                    at.set_fontsize(9)
+                ax1.set_title("Distribusi Churn", fontsize=11, pad=10)
                 ax1.axis('equal')
                 fig1.tight_layout()
                 st.pyplot(fig1, use_container_width=True)
 
             with col2:
                 fig2, ax2 = plt.subplots(figsize=FIGSIZE)
-                colors = ["#FFA726", "#FB8C00", "#F57C00", "#42A5F5"]
-                ax2.bar(period_counts.index, period_counts.values, color=colors, width=0.6)
-                ax2.set_title("Distribusi Periode Churn", fontsize=12, pad=10)
-                ax2.set_ylabel("Jumlah Karyawan", fontsize=10)
-                ax2.tick_params(axis='x', rotation=20)
+                colors = ["#F39C12", "#E67E22", "#D35400", "#3498DB"]
+                bars = ax2.bar(period_counts.index, period_counts.values, color=colors, width=0.6)
+                ax2.set_title("Distribusi Periode Churn", fontsize=11, pad=10)
+                ax2.set_ylabel("Jumlah Karyawan", fontsize=9)
+                ax2.tick_params(axis='x', rotation=15)
                 ax2.set_ylim(0, max(period_counts.values)*1.2)
+                ax2.bar_label(bars, fmt="%d", fontsize=8, label_type='edge', padding=2)
                 fig2.tight_layout()
                 st.pyplot(fig2, use_container_width=True)
 
@@ -462,9 +490,13 @@ with tab2:
 
                         risk_counts = df_result["risk_level"].value_counts().reindex(labels, fill_value=0)
                         fig_risk, ax_risk = plt.subplots(figsize=(5, 3.5))
-                        ax_risk.bar(risk_counts.index, risk_counts.values, color=["#66BB6A", "#FFA726", "#EF5350"], width=0.6)
-                        ax_risk.set_title("Distribusi Level Risiko Karyawan", fontsize=12, pad=10)
-                        ax_risk.set_ylabel("Jumlah Karyawan", fontsize=10)
+                        risk_colors = ["#2ECC71", "#F1C40F", "#E74C3C"]
+                        bars = ax_risk.bar(risk_counts.index, risk_counts.values, color=risk_colors, width=0.6)
+                        ax_risk.set_title("Distribusi Level Risiko Karyawan", fontsize=11, pad=10)
+                        ax_risk.set_ylabel("Jumlah Karyawan", fontsize=9)
+                        ax_risk.tick_params(axis='x', rotation=0)
+                        ax_risk.bar_label(bars, fmt="%d", fontsize=8, label_type='edge', padding=2)
+                        fig_risk.tight_layout()
                         st.pyplot(fig_risk, use_container_width=True)
 
                         # Insight tambahan
@@ -479,11 +511,20 @@ with tab2:
                 
                     try:
                         faktor_mean = df_result.groupby("churn_label_final")[["job_satisfaction", "manager_support_score", "target_achievement"]].mean().T
-                        fig_faktor, ax_faktor = plt.subplots(figsize=(5.5, 3.5))
-                        faktor_mean.plot(kind="bar", ax=ax_faktor)
-                        ax_faktor.set_title("Perbandingan Faktor Rata-rata: Churn vs No Churn", fontsize=12, pad=10)
-                        ax_faktor.set_ylabel("Rata-rata Skor")
-                        ax_faktor.tick_params(axis="x", rotation=0)
+                        fig_faktor, ax_faktor = plt.subplots(figsize=(6, 4))
+                        rename_map = {
+                            "job_satisfaction": "Job Satisfaction",
+                            "manager_support_score": "Manager Support",
+                            "target_achievement": "Target\nAchievement"
+                        }
+                        faktor_mean.index = faktor_mean.index.to_series().map(rename_map).fillna(faktor_mean.index)
+                        faktor_mean.plot(kind="bar", ax=ax_faktor, width=0.65, color=["#3498DB", "#F39C12"])
+                        
+                        ax_faktor.set_title("Perbandingan Faktor Rata-rata: Churn vs No Churn", fontsize=11, pad=10)
+                        ax_faktor.set_ylabel("Rata-rata Skor", fontsize=10)
+                        ax_faktor.tick_params(axis="x", rotation=15)
+                        ax_faktor.legend(title="Status", loc="upper right", fontsize=8)
+                        fig_faktor.tight_layout()
                         st.pyplot(fig_faktor, use_container_width=True)
                     except Exception as e:
                         st.warning(f"⚠️ Tidak dapat menampilkan analisis faktor: {e}")
