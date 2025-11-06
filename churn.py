@@ -388,6 +388,84 @@ with tab2:
                 st.pyplot(fig2, use_container_width=True)
 
             # ================================
+            # 🧾 RINGKASAN HASIL PREDIKSI
+            # ================================
+            st.subheader("📊 Ringkasan Hasil Prediksi Batch")
+
+            try:
+                total_karyawan = len(df_result)
+                total_churn = df_result["churn_pred"].sum()
+                persen_churn = (total_churn / total_karyawan) * 100
+                periode_counts = df_result["churn_period_label"].value_counts()
+
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("👥 Total Karyawan", total_karyawan)
+                col2.metric("🚪 Prediksi Churn", total_churn, f"{persen_churn:.1f}%")
+                col3.metric("🧭 Rata-rata Tenure", f"{df_result['company_tenure_years'].mean():.1f} tahun")
+                col4.metric("🔥 Periode Churn Tertinggi", periode_counts.idxmax() if not periode_counts.empty else "-")
+
+                # ================================
+                # 🧠 INTERPRETASI OTOMATIS
+                # ================================
+                st.subheader("🧠 Insight Otomatis HR")
+
+                if persen_churn > 50:
+                    st.error(f"Tingkat churn **sangat tinggi ({persen_churn:.1f}%)**. "
+                             "Perlu perhatian pada faktor kepuasan kerja dan dukungan manajer.")
+                elif persen_churn > 30:
+                    st.warning(f"Tingkat churn **menengah ({persen_churn:.1f}%)**. "
+                               f"Periode churn terbanyak: **{periode_counts.idxmax()}**. "
+                               "Fokus pada retensi karyawan baru dan keseimbangan kerja.")
+                else:
+                    st.success(f"Tingkat churn **rendah ({persen_churn:.1f}%)**. "
+                               "Strategi retensi tampaknya efektif — pertahankan faktor motivasi & komunikasi yang ada.")
+
+                # ================================
+                # 🎯 SEGMENTASI RISIKO
+                # ================================
+                st.subheader("🎯 Segmentasi Risiko Karyawan")
+                
+                try:
+                    churn_probs = churn_model.predict_proba(preprocess_batch_robust(df_raw))[:, 1]
+                    df_result["churn_prob"] = churn_probs
+
+                    bins = [0, 0.33, 0.66, 1.0]
+                    labels = ["Low", "Medium", "High"]
+                    df_result["risk_level"] = pd.cut(df_result["churn_prob"], bins=bins, labels=labels)
+
+                    risk_counts = df_result["risk_level"].value_counts().reindex(labels, fill_value=0)
+                    fig_risk, ax_risk = plt.subplots(figsize=(5, 3.5))
+                    ax_risk.bar(risk_counts.index, risk_counts.values, color=["#66BB6A", "#FFA726", "#EF5350"], width=0.6)
+                    ax_risk.set_title("Distribusi Level Risiko Karyawan", fontsize=12, pad=10)
+                    ax_risk.set_ylabel("Jumlah Karyawan", fontsize=10)
+                    st.pyplot(fig_risk, use_container_width=True)
+
+                    # Insight tambahan
+                    if risk_counts["High"] > 0:
+                        st.warning(f"⚠️ {risk_counts['High']} karyawan dikategorikan **risiko tinggi** untuk resign dalam waktu dekat.")
+                except Exception:
+                    st.info("Model tidak mendukung probabilitas churn (predict_proba).")
+
+                # ================================
+                # 💡 ANALISIS FAKTOR PENTING (RINGKAS)
+                # ================================
+                st.subheader("💡 Analisis Faktor Penting terhadap Churn")
+
+                try:
+                    faktor_mean = df_result.groupby("churn_label_final")[["job_satisfaction", "manager_support_score", "target_achievement"]].mean().T
+                    fig_faktor, ax_faktor = plt.subplots(figsize=(5.5, 3.5))
+                    faktor_mean.plot(kind="bar", ax=ax_faktor)
+                    ax_faktor.set_title("Perbandingan Faktor Rata-rata: Churn vs No Churn", fontsize=12, pad=10)
+                    ax_faktor.set_ylabel("Rata-rata Skor")
+                    ax_faktor.tick_params(axis="x", rotation=0)
+                    st.pyplot(fig_faktor, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"⚠️ Tidak dapat menampilkan analisis faktor: {e}")
+
+            except Exception as e:
+                st.warning(f"⚠️ Tidak dapat membuat ringkasan: {e}")
+
+            # ================================
             # 📈 SAMPLE PREVIEW
             # ================================
             st.subheader("📋 Contoh Data Hasil Prediksi")
