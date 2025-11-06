@@ -510,59 +510,32 @@ with tab2:
                     st.markdown("#### 💡 Analisis Faktor Penting terhadap Churn")
 
                     try:
-                        faktor_cols = ["job_satisfaction", "manager_support_score", "target_achievement"]
-                        available_cols = [c for c in faktor_cols if c in df_result.columns]
-                        if not available_cols:
-                            st.warning("⚠️ Tidak ada kolom faktor yang bisa dianalisis.")
-                        else:
-                            # Pastikan hanya gunakan kolom yang ada
-                            faktor_mean = df_result.groupby("churn_label_final")[available_cols].mean()
-
-                            # Jika hanya 1 kelompok churn_label_final (misal semua Churn)
-                            if faktor_mean.shape[0] < 2:
-                                st.warning("⚠️ Data hanya memiliki satu kategori (semua Churn atau semua No Churn). Tidak bisa dibandingkan.")
-                                faktor_mean = faktor_mean.T
-                                faktor_mean.columns = ["Nilai Rata-rata"]
-                                fig_faktor, ax_faktor = plt.subplots(figsize=(6, 4))
-                                faktor_mean.plot(kind="bar", ax=ax_faktor, color="#3498DB", width=0.6)
-                                ax_faktor.set_title("Rata-rata Faktor Karyawan", fontsize=11, pad=10)
-                                ax_faktor.set_ylabel("Rata-rata Skor", fontsize=10)
-                                ax_faktor.tick_params(axis="x", rotation=15)
-                                fig_faktor.tight_layout()
-                                st.pyplot(fig_faktor, use_container_width=True)
-                            else:
-                                # Normal: ada dua grup Churn vs No Churn
-                                faktor_mean = faktor_mean.T
-
-                                rename_map = {
+                        faktor_mean = df_result.groupby("churn_label_final")[["job_satisfaction", "manager_support_score", "target_achievement"]].mean().T
+                        fig_faktor, ax_faktor = plt.subplots(figsize=(6, 4))
+                        rename_map = {
                                     "job_satisfaction": "Job Satisfaction",
                                     "manager_support_score": "Manager Support",
                                     "target_achievement": "Target\nAchievement"}
-                                faktor_mean.index = faktor_mean.index.to_series().map(rename_map).fillna(faktor_mean.index)
+                        faktor_mean.index = faktor_mean.index.to_series().map(rename_map).fillna(faktor_mean.index)
+                        faktor_mean.plot(kind="bar", ax=ax_faktor, width=0.65, color=["#3498DB", "#F39C12"])
+                        
+                        ax_faktor.set_title("Perbandingan Faktor Rata-rata: Churn vs No Churn", fontsize=11, pad=10)
+                        ax_faktor.set_ylabel("Rata-rata Skor", fontsize=10)
+                        ax_faktor.tick_params(axis="x", rotation=15)
+                        ax_faktor.legend(title="Status", loc="upper right", fontsize=8)
+                        ax_faktor.grid(axis="y", linestyle="--", alpha=0.4)
+                        fig_faktor.tight_layout()
+                        st.pyplot(fig_faktor, use_container_width=True)
 
-                                fig_faktor, ax_faktor = plt.subplots(figsize=(6, 4))
-                                faktor_mean.plot(kind="bar", ax=ax_faktor, width=0.65, color=["#3498DB", "#F39C12"])
-
-                                ax_faktor.set_title("Perbandingan Faktor Rata-rata: Churn vs No Churn", fontsize=11, pad=10)
-                                ax_faktor.set_ylabel("Rata-rata Skor", fontsize=10)
-                                ax_faktor.tick_params(axis="x", rotation=15)
-                                ax_faktor.legend(title="Status", loc="upper right", fontsize=8)
-                                fig_faktor.tight_layout()
-                                st.pyplot(fig_faktor, use_container_width=True)
-
-                                # Insight otomatis
-                                if "Churn" in faktor_mean.columns and "No Churn" in faktor_mean.columns:
-                                    for idx in faktor_mean.index:
-                                        val_churn = faktor_mean.loc[idx, "Churn"]
-                                        val_no_churn = faktor_mean.loc[idx, "No Churn"]
-                                        if val_churn < val_no_churn:
-                                            st.info(f"📉 **{idx}** lebih rendah pada karyawan yang churn.")
-                                        elif val_churn > val_no_churn:
-                                            st.success(f"📈 **{idx}** lebih tinggi pada karyawan yang churn.")
-                                else:
-                                    st.info("ℹ️ Data tidak memiliki kedua kelompok lengkap (Churn & No Churn).")
+                        # Insight singkat otomatis
+                        if faktor_mean.loc["job_satisfaction", "Churn"] < faktor_mean.loc["job_satisfaction", "No Churn"]:
+                            st.info("📉 Karyawan yang churn cenderung memiliki **kepuasan kerja lebih rendah**.")
+                        if faktor_mean.loc["manager_support_score", "Churn"] < faktor_mean.loc["manager_support_score", "No Churn"]:
+                            st.info("🤝 Dukungan manajer juga tampak lebih rendah pada kelompok churn.")
+                        if faktor_mean.loc["target_achievement", "Churn"] < faktor_mean.loc["target_achievement", "No Churn"]:
+                            st.info("🎯 Pencapaian target lebih rendah pada karyawan yang churn.")
                     except Exception as e:
-                        st.warning(f"⚠️ Tidak dapat menampilkan analisis faktor: {e}")
+                        st.warning(f"⚠️ Tidak dapat menampilkan analisis faktor: {e}")       
             except Exception as e:
                 st.warning(f"⚠️ Tidak dapat membuat ringkasan: {e}")
 
