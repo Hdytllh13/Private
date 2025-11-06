@@ -416,6 +416,34 @@ with tab2:
             else:
                 st.info("Kolom 'employee_id' tidak ditemukan di file input.")
 
+            # =====================================================
+            # 💾 DOWNLOAD FILE HASIL PREDIKSI DALAM FORMAT EXCEL
+            # =====================================================
+            from io import BytesIO
+
+            def to_excel(df):
+                """Konversi DataFrame ke file Excel (XLSX) dalam memory."""
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Prediksi")
+                # Optional styling
+                workbook = writer.book
+                worksheet = writer.sheets["Prediksi"]
+                for i, col in enumerate(df.columns):
+                    col_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
+                    worksheet.set_column(i, i, col_width)
+                processed_data = output.getvalue()
+                return processed_data
+
+            # Tombol download Excel muncul di bawah tabel
+            excel_data = to_excel(df_result)
+            st.download_button(
+                label="📥 Download Hasil Prediksi (Excel)",
+                data=excel_data,
+                file_name="hasil_prediksi_churn.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
             # ================================
             # 🔍 SHAP – ANALISIS FAKTOR RISIKO
             # ================================
