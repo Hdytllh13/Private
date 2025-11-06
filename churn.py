@@ -424,14 +424,17 @@ with tab2:
             def to_excel(df):
                 """Konversi DataFrame ke file Excel (XLSX) dalam memory."""
                 output = BytesIO()
-                with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    df.to_excel(writer, index=False, sheet_name="Prediksi")
-                # Optional styling
-                workbook = writer.book
-                worksheet = writer.sheets["Prediksi"]
-                for i, col in enumerate(df.columns):
-                    col_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
-                    worksheet.set_column(i, i, col_width)
+                try:
+                    import openpyxl
+                    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                        df.to_excel(writer, index=False, sheet_name="Prediksi")
+                except ImportError:
+                    try: 
+                        import xlsxwriter
+                        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                            df.to_excel(writer, index=False, sheet_name="Prediksi")
+                    except Exception:
+                        df.to_csv(output, index=False)
                 processed_data = output.getvalue()
                 return processed_data
 
