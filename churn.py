@@ -216,6 +216,12 @@ def align_for_model(X, model):
 # =====================================================
 def preprocess_batch_robust(df):
     df = df.copy()
+
+    # Simpan kolom identitas (jika ada)
+    id_cols = [c for c in ['employee_id', 'employee_name'] if c in df.columns]
+    id_data = df[id_cols].copy() if id_cols else pd.DataFrame()
+
+    # Cek kolom wajib
     required_cols = [
         'target_achievement', 'company_tenure_years', 'distance_to_office_km',
         'job_satisfaction', 'manager_support_score', 'marital_status', 'working_hours_per_week'
@@ -256,6 +262,11 @@ def preprocess_batch_robust(df):
 
     X_scaled = scaler.transform(X)
     return pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
+    
+    if not id_data.empty:
+        df_scaled = pd.concat([id_data.reset_index(drop=True), df_scaled.reset_index(drop=True)], axis=1)
+
+    return df_scaled
 
 # =====================================================
 # 🧩 PREPROCESS FOR churn_period_model
@@ -273,7 +284,10 @@ def preprocess_for_churn_period(df_scaled):
 # =====================================================
 def predict_batch_safe(df_raw):
     X_scaled = preprocess_batch_robust(df_raw)
-    X_for_churn = align_for_model(X_scaled, churn_model)
+    id_cols = [c for c in ['employee_id', 'employee_name'] if c in X_scaled.columns]
+    
+    # Hapus kolom ID/Nama sebelum prediksi
+    X_for_churn = align_for_model(X_scaled.drop(columns=id_cols, errors='ignore'), churn_model)
 
     churn_pred = churn_model.predict(X_for_churn).astype(int)
     churn_period_pred = []
@@ -307,6 +321,12 @@ def predict_batch_safe(df_raw):
     df_result.loc[(df_result['churn_pred'] == 1) & (df_result['churn_period_label'] == "Stayed"), 'churn_period_label'] = "Onboarding"
 
     df_result['churn_label_final'] = df_result['churn_pred'].map({0: "No Churn", 1: "Churn"})
+    
+    # Susun ulang kolom agar ID & nama tampil di depan
+    if id_cols:
+        cols = id_cols + [c for c in df_result.columns if c not in id_cols]
+        df_result = df_result[cols]
+    
     return df_result
 # =====================================
 
@@ -379,6 +399,22 @@ with tab2:
                 st.dataframe(df_result.tail(10))
             else:
                 st.dataframe(df_result.sample(min(10, len(df_result))))
+
+            # ================================
+            # 🔎 PENCARIAN BERDASARKAN ID KARYAWAN
+            # ================================
+            st.subheader("🔎 Cari Hasil Prediksi Berdasarkan Employee ID")
+
+            if 'employee_id' in df_result.columns:
+                search_val = st.text_input("Masukkan Employee ID:")
+                if search_val:
+                    filtered = df_result[df_result['employee_id'].astype(str).str.contains(search_val, case=False, na=False)]
+                    if len(filtered) > 0:
+                        st.dataframe(filtered)
+                    else:
+                        st.warning("❌ Tidak ditemukan hasil untuk Employee ID tersebut.")
+            else:
+                st.info("Kolom 'employee_id' tidak ditemukan di file input.")
 
             # ================================
             # 🔍 SHAP – ANALISIS FAKTOR RISIKO
